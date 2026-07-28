@@ -21,7 +21,11 @@ app.get('/api/test-db', async (req, res) => {
     res.json({ message: 'Database connected successfully!', result: rows[0].result });
   } catch (error) {
     console.error('Database connection error:', error);
-    res.status(500).json({ error: 'Database connection failed', details: error.message });
+    res.status(500).json({
+      error: 'Database connection failed',
+      details: error.message,
+      suggestion: 'Check DB_USER, DB_PASS, DB_NAME, and DB_HOST in .env. Ensure the database user is assigned to the database with ALL PRIVILEGES in Hostinger hPanel.'
+    });
   }
 });
 
