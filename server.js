@@ -5,9 +5,44 @@ require('dotenv').config();
 
 const app = express();
 
+// Prevent server process crashes on uncaught errors (prevents Hostinger 503 Service Unavailable)
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Function to auto-create students table if it doesn't exist in MySQL
+async function initDb() {
+  try {
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        roll VARCHAR(100) NOT NULL,
+        class VARCHAR(100) NOT NULL,
+        section VARCHAR(100) DEFAULT NULL,
+        phone VARCHAR(50) DEFAULT NULL,
+        image TEXT DEFAULT NULL,
+        address TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `;
+    await pool.execute(createTableQuery);
+    console.log('Students table checked/created successfully in MySQL database.');
+  } catch (error) {
+    console.error('Error initializing database table:', error.message);
+  }
+}
+
+// Run DB table initialization
+initDb();
 
 // Basic Root Route
 app.get('/', (req, res) => {
@@ -40,6 +75,7 @@ app.post('/api/students', async (req, res) => {
   }
 
   try {
+    await initDb(); // Ensure table exists
     const query = `
       INSERT INTO students (name, roll, class, section, phone, image, address) 
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -67,11 +103,16 @@ app.post('/api/students', async (req, res) => {
 // 2. Get all students (READ ALL)
 app.get('/api/students', async (req, res) => {
   try {
+    await initDb(); // Ensure table exists
     const [rows] = await pool.execute('SELECT * FROM students ORDER BY id DESC');
     res.status(200).json(rows);
   } catch (error) {
     console.error('Error fetching students:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to fetch students', 
+      details: error.message,
+      suggestion: 'Please verify database connection credentials in .env and ensure MySQL database user has table permissions.'
+    });
   }
 });
 
@@ -144,3 +185,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = app;
+
