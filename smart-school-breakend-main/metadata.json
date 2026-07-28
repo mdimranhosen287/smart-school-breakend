@@ -1,0 +1,6 @@
+{
+  "name": "Smart School Backend",
+  "description": "Smart School Management System with REST API, AI Notice Generator, and Interactive Admin Dashboard",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
