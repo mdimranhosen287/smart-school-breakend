@@ -1,0 +1,6 @@
+{
+  "name": "Dhaka Academy School Website",
+  "description": "An interactive, modern, and fully responsive school website and student portal featuring notices, admission forms, and an advanced Student Details & Monthly Attendance Management System with Excel and PDF outputs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
