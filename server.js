@@ -64,13 +64,22 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
+// Banner Dummy Route
+app.get('/api/banner', (req, res) => {
+  res.status(200).json({
+    message: "Banner fetched successfully",
+    banners: []
+  });
+});
+
 // ================= STUDENTS CRUD API ROUTES ================= //
 
 // 1. Add new student (CREATE)
 app.post('/api/students', async (req, res) => {
-  const { name, roll, class: className, section, phone, image, address } = req.body;
+  const { name, roll, roll_number, class: className, section, phone, image, address } = req.body;
+  const studentRoll = roll || roll_number;
   
-  if (!name || !roll || !className) {
+  if (!name || !studentRoll || !className) {
     return res.status(400).json({ error: "Name, Roll, and Class are required!" });
   }
 
@@ -82,7 +91,7 @@ app.post('/api/students', async (req, res) => {
     `;
     const [result] = await pool.execute(query, [
       name,
-      roll,
+      studentRoll,
       className,
       section || null,
       phone || null,
@@ -134,7 +143,8 @@ app.get('/api/students/:id', async (req, res) => {
 // 4. Update student information (UPDATE)
 app.put('/api/students/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, roll, class: className, section, phone, image, address } = req.body;
+  const { name, roll, roll_number, class: className, section, phone, image, address } = req.body;
+  const studentRoll = roll || roll_number;
 
   try {
     const query = `
@@ -144,7 +154,7 @@ app.put('/api/students/:id', async (req, res) => {
     `;
     const [result] = await pool.execute(query, [
       name,
-      roll,
+      studentRoll,
       className,
       section || null,
       phone || null,
