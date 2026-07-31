@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const pool = require('./db');
 require('dotenv').config();
 
@@ -24,22 +26,43 @@ app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// In-memory fallback store when MySQL is unreachable
-let memoryStudents = [
-  {
-    id: 1,
-    name: "Rahim Ahmed",
-    roll: "101",
-    class: "10",
-    section: "A",
-    phone: "01700000000",
-    image: "https://via.placeholder.com/150",
-    address: "Dhaka, Bangladesh",
-    created_at: new Date().toISOString()
+// Persistent file-backed store when MySQL is unreachable
+const STUDENTS_FILE = path.join(__dirname, 'students.json');
+let memoryStudents = [];
+try {
+  if (fs.existsSync(STUDENTS_FILE)) {
+    const data = fs.readFileSync(STUDENTS_FILE, 'utf8');
+    memoryStudents = JSON.parse(data);
+  } else {
+    memoryStudents = [
+      {
+        id: 1,
+        name: "Rahim Ahmed",
+        roll: "101",
+        class: "10",
+        section: "A",
+        phone: "01700000000",
+        image: "https://via.placeholder.com/150",
+        address: "Dhaka, Bangladesh",
+        created_at: new Date().toISOString()
+      }
+    ];
+    fs.writeFileSync(STUDENTS_FILE, JSON.stringify(memoryStudents, null, 2));
   }
-];
-let nextStudentId = 2;
+} catch (e) {
+  console.error('Error reading/writing students.json:', e);
+}
+
+let nextStudentId = memoryStudents.length > 0 ? Math.max(...memoryStudents.map(s => Number(s.id) || 0)) + 1 : 2;
 let useDatabase = true;
+
+function saveMemoryStudents() {
+  try {
+    fs.writeFileSync(STUDENTS_FILE, JSON.stringify(memoryStudents, null, 2));
+  } catch (e) {
+    console.error('Error saving students.json:', e);
+  }
+}
 
 // Function to auto-create students table if it doesn't exist in MySQL and ensure schema compatibility
 async function initDb() {
@@ -182,8 +205,9 @@ app.post('/api/students', async (req, res) => {
       created_at: new Date().toISOString()
     };
     memoryStudents.unshift(newStudent);
+    saveMemoryStudents();
     return res.status(201).json({ 
-      message: "Student added successfully (Memory mode)!", 
+      message: "Student added successfully (Persistent fallback mode)!", 
       studentId: newStudent.id 
     });
   } catch (err) {
@@ -293,7 +317,8 @@ app.put('/api/students/:id', async (req, res) => {
       image: image !== undefined ? image : memoryStudents[index].image,
       address: address !== undefined ? address : memoryStudents[index].address,
     };
-    return res.status(200).json({ message: "Student updated successfully (Memory mode)!" });
+    saveMemoryStudents();
+    return res.status(200).json({ message: "Student updated successfully (Persistent fallback mode)!" });
   } catch (err) {
     console.error('Error in PUT /api/students/:id:', err);
     return res.status(500).json({ error: err.message || "Internal server error" });
@@ -325,7 +350,8 @@ app.delete('/api/students/:id', async (req, res) => {
       return res.status(404).json({ message: "Student not found!" });
     }
     memoryStudents.splice(index, 1);
-    return res.status(200).json({ message: "Student deleted successfully (Memory mode)!" });
+    saveMemoryStudents();
+    return res.status(200).json({ message: "Student deleted successfully (Persistent fallback mode)!" });
   } catch (err) {
     console.error('Error in DELETE /api/students/:id:', err);
     return res.status(500).json({ error: err.message || "Internal server error" });
