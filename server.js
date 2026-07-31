@@ -135,176 +135,201 @@ app.get('/api/banner', (req, res) => {
 
 // 1. Add new student (CREATE)
 app.post('/api/students', async (req, res) => {
-  const { name, roll, roll_number, class: className, section, phone, image, address } = req.body;
-  const studentRoll = roll || roll_number;
-  
-  if (!name || !studentRoll || !className) {
-    return res.status(400).json({ error: "Name, Roll, and Class are required!" });
-  }
-
-  if (useDatabase) {
-    try {
-      const query = `
-        INSERT INTO students (name, roll, class, section, phone, image, address) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `;
-      const [result] = await pool.execute(query, [
-        name,
-        studentRoll,
-        className,
-        section || null,
-        phone || null,
-        image || null,
-        address || null
-      ]);
-      
-      return res.status(201).json({ 
-        message: "Student added successfully!", 
-        studentId: result.insertId 
-      });
-    } catch (error) {
-      console.error('MySQL insert error, switching to memory fallback:', error.message);
-      useDatabase = false;
+  try {
+    const { name, roll, roll_number, class: className, section, phone, image, address } = req.body;
+    const studentRoll = roll || roll_number;
+    
+    if (!name || !studentRoll || !className) {
+      return res.status(400).json({ error: "Name, Roll, and Class are required!" });
     }
-  }
 
-  // Memory fallback
-  const newStudent = {
-    id: nextStudentId++,
-    name,
-    roll: studentRoll,
-    class: className,
-    section: section || null,
-    phone: phone || null,
-    image: image || null,
-    address: address || null,
-    created_at: new Date().toISOString()
-  };
-  memoryStudents.unshift(newStudent);
-  res.status(201).json({ 
-    message: "Student added successfully (Memory mode)!", 
-    studentId: newStudent.id 
-  });
+    if (useDatabase) {
+      try {
+        const query = `
+          INSERT INTO students (name, roll, class, section, phone, image, address) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        const [result] = await pool.execute(query, [
+          name,
+          studentRoll,
+          className,
+          section || null,
+          phone || null,
+          image || null,
+          address || null
+        ]);
+        
+        return res.status(201).json({ 
+          message: "Student added successfully!", 
+          studentId: result.insertId 
+        });
+      } catch (error) {
+        console.error('MySQL insert error, switching to memory fallback:', error.message);
+        useDatabase = false;
+      }
+    }
+
+    // Memory fallback
+    const newStudent = {
+      id: nextStudentId++,
+      name,
+      roll: studentRoll,
+      class: className,
+      section: section || null,
+      phone: phone || null,
+      image: image || null,
+      address: address || null,
+      created_at: new Date().toISOString()
+    };
+    memoryStudents.unshift(newStudent);
+    return res.status(201).json({ 
+      message: "Student added successfully (Memory mode)!", 
+      studentId: newStudent.id 
+    });
+  } catch (err) {
+    console.error('Error in POST /api/students:', err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
+  }
 });
 
 // 2. Get all students (READ ALL)
 app.get('/api/students', async (req, res) => {
-  if (useDatabase) {
-    try {
-      const [rows] = await pool.execute('SELECT * FROM students ORDER BY id DESC');
-      return res.status(200).json(rows);
-    } catch (error) {
-      console.error('MySQL fetch error, switching to memory fallback:', error.message);
-      useDatabase = false;
+  try {
+    if (useDatabase) {
+      try {
+        const [rows] = await pool.execute('SELECT * FROM students ORDER BY id DESC');
+        return res.status(200).json(rows);
+      } catch (error) {
+        console.error('MySQL fetch error, switching to memory fallback:', error.message);
+        useDatabase = false;
+      }
     }
-  }
 
-  // Memory fallback
-  res.status(200).json(memoryStudents);
+    // Memory fallback
+    return res.status(200).json(memoryStudents);
+  } catch (err) {
+    console.error('Error in GET /api/students:', err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
+  }
 });
 
 // 3. Get single student by ID (READ SINGLE)
 app.get('/api/students/:id', async (req, res) => {
-  const { id } = req.params;
-  if (useDatabase) {
-    try {
-      const [rows] = await pool.execute('SELECT * FROM students WHERE id = ?', [id]);
-      if (rows.length === 0) {
-        return res.status(404).json({ message: "Student not found!" });
+  try {
+    const { id } = req.params;
+    if (useDatabase) {
+      try {
+        const [rows] = await pool.execute('SELECT * FROM students WHERE id = ?', [id]);
+        if (rows.length === 0) {
+          return res.status(404).json({ message: "Student not found!" });
+        }
+        return res.status(200).json(rows[0]);
+      } catch (error) {
+        console.error('MySQL fetch single error, switching to memory fallback:', error.message);
+        useDatabase = false;
       }
-      return res.status(200).json(rows[0]);
-    } catch (error) {
-      console.error('MySQL fetch single error, switching to memory fallback:', error.message);
-      useDatabase = false;
     }
-  }
 
-  // Memory fallback
-  const student = memoryStudents.find(s => s.id == id);
-  if (!student) {
-    return res.status(404).json({ message: "Student not found!" });
+    // Memory fallback
+    const student = memoryStudents.find(s => s.id == id);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found!" });
+    }
+    return res.status(200).json(student);
+  } catch (err) {
+    console.error('Error in GET /api/students/:id:', err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
-  res.status(200).json(student);
 });
 
 // 4. Update student information (UPDATE)
 app.put('/api/students/:id', async (req, res) => {
-  const { id } = req.params;
-  const { name, roll, roll_number, class: className, section, phone, image, address } = req.body;
-  const studentRoll = roll || roll_number;
+  try {
+    const { id } = req.params;
+    const { name, roll, roll_number, class: className, section, phone, image, address } = req.body;
+    const studentRoll = roll || roll_number;
 
-  if (useDatabase) {
-    try {
-      const query = `
-        UPDATE students 
-        SET name = ?, roll = ?, class = ?, section = ?, phone = ?, image = ?, address = ? 
-        WHERE id = ?
-      `;
-      const [result] = await pool.execute(query, [
-        name,
-        studentRoll,
-        className,
-        section || null,
-        phone || null,
-        image || null,
-        address || null,
-        id
-      ]);
-      
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Student not found!" });
+    if (useDatabase) {
+      try {
+        const query = `
+          UPDATE students 
+          SET name = ?, roll = ?, class = ?, section = ?, phone = ?, image = ?, address = ? 
+          WHERE id = ?
+        `;
+        const [result] = await pool.execute(query, [
+          name,
+          studentRoll,
+          className,
+          section || null,
+          phone || null,
+          image || null,
+          address || null,
+          id
+        ]);
+        
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ message: "Student not found!" });
+        }
+
+        return res.status(200).json({ message: "Student updated successfully!" });
+      } catch (error) {
+        console.error('MySQL update error, switching to memory fallback:', error.message);
+        useDatabase = false;
       }
-
-      return res.status(200).json({ message: "Student updated successfully!" });
-    } catch (error) {
-      console.error('MySQL update error, switching to memory fallback:', error.message);
-      useDatabase = false;
     }
-  }
 
-  // Memory fallback
-  const index = memoryStudents.findIndex(s => s.id == id);
-  if (index === -1) {
-    return res.status(404).json({ message: "Student not found!" });
+    // Memory fallback
+    const index = memoryStudents.findIndex(s => s.id == id);
+    if (index === -1) {
+      return res.status(404).json({ message: "Student not found!" });
+    }
+    memoryStudents[index] = {
+      ...memoryStudents[index],
+      name: name !== undefined ? name : memoryStudents[index].name,
+      roll: studentRoll !== undefined ? studentRoll : memoryStudents[index].roll,
+      class: className !== undefined ? className : memoryStudents[index].class,
+      section: section !== undefined ? section : memoryStudents[index].section,
+      phone: phone !== undefined ? phone : memoryStudents[index].phone,
+      image: image !== undefined ? image : memoryStudents[index].image,
+      address: address !== undefined ? address : memoryStudents[index].address,
+    };
+    return res.status(200).json({ message: "Student updated successfully (Memory mode)!" });
+  } catch (err) {
+    console.error('Error in PUT /api/students/:id:', err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
-  memoryStudents[index] = {
-    ...memoryStudents[index],
-    name: name !== undefined ? name : memoryStudents[index].name,
-    roll: studentRoll !== undefined ? studentRoll : memoryStudents[index].roll,
-    class: className !== undefined ? className : memoryStudents[index].class,
-    section: section !== undefined ? section : memoryStudents[index].section,
-    phone: phone !== undefined ? phone : memoryStudents[index].phone,
-    image: image !== undefined ? image : memoryStudents[index].image,
-    address: address !== undefined ? address : memoryStudents[index].address,
-  };
-  res.status(200).json({ message: "Student updated successfully (Memory mode)!" });
 });
 
 // 5. Delete student (DELETE)
 app.delete('/api/students/:id', async (req, res) => {
-  const { id } = req.params;
-  if (useDatabase) {
-    try {
-      const [result] = await pool.execute('DELETE FROM students WHERE id = ?', [id]);
-      
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Student not found!" });
+  try {
+    const { id } = req.params;
+    if (useDatabase) {
+      try {
+        const [result] = await pool.execute('DELETE FROM students WHERE id = ?', [id]);
+        
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ message: "Student not found!" });
+        }
+
+        return res.status(200).json({ message: "Student deleted successfully!" });
+      } catch (error) {
+        console.error('MySQL delete error, switching to memory fallback:', error.message);
+        useDatabase = false;
       }
-
-      return res.status(200).json({ message: "Student deleted successfully!" });
-    } catch (error) {
-      console.error('MySQL delete error, switching to memory fallback:', error.message);
-      useDatabase = false;
     }
-  }
 
-  // Memory fallback
-  const index = memoryStudents.findIndex(s => s.id == id);
-  if (index === -1) {
-    return res.status(404).json({ message: "Student not found!" });
+    // Memory fallback
+    const index = memoryStudents.findIndex(s => s.id == id);
+    if (index === -1) {
+      return res.status(404).json({ message: "Student not found!" });
+    }
+    memoryStudents.splice(index, 1);
+    return res.status(200).json({ message: "Student deleted successfully (Memory mode)!" });
+  } catch (err) {
+    console.error('Error in DELETE /api/students/:id:', err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
-  memoryStudents.splice(index, 1);
-  res.status(200).json({ message: "Student deleted successfully (Memory mode)!" });
 });
 
 const PORT = process.env.PORT || 3000;
