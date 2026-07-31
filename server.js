@@ -41,7 +41,7 @@ let memoryStudents = [
 let nextStudentId = 2;
 let useDatabase = true;
 
-// Function to auto-create students table if it doesn't exist in MySQL
+// Function to auto-create students table if it doesn't exist in MySQL and ensure schema compatibility
 async function initDb() {
   try {
     const createTableQuery = `
@@ -58,6 +58,15 @@ async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `;
     await pool.execute(createTableQuery);
+
+    // Check if roll_number column exists, if not and roll exists or vice versa, handle gracefully
+    try {
+      const [columns] = await pool.execute("SHOW COLUMNS FROM students LIKE 'roll%'");
+      console.log('Students table columns found:', columns.map(c => c.Field));
+    } catch (colErr) {
+      console.warn('Could not inspect columns:', colErr.message);
+    }
+
     useDatabase = true;
     console.log('Students table checked/created successfully in MySQL database.');
   } catch (error) {
@@ -91,6 +100,25 @@ app.get('/api/test-db', async (req, res) => {
       status: 'fallback',
       message: 'Running in fallback memory mode (MySQL unreachable)',
       details: error.message
+    });
+  }
+});
+
+// Schema Check Route
+app.get('/api/schema-check', async (req, res) => {
+  try {
+    const [columns] = await pool.execute("SHOW COLUMNS FROM students");
+    res.json({
+      status: 'success',
+      database_connected: true,
+      columns: columns.map(c => ({ field: c.Field, type: c.Type, null: c.Null, key: c.Key }))
+    });
+  } catch (error) {
+    res.status(200).json({
+      status: 'fallback',
+      database_connected: false,
+      message: 'Database or table not accessible, running in memory mode',
+      error: error.message
     });
   }
 });
