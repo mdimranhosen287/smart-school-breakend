@@ -37,7 +37,11 @@ async function initDb() {
     await pool.execute(createTableQuery);
     console.log('Students table checked/created successfully in MySQL database.');
   } catch (error) {
-    console.error('Error initializing database table:', error.message);
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      console.log(`Database note: Could not connect to MySQL at ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306} (${error.message}). This is normal in preview if the DB is remote.`);
+    } else {
+      console.error('Error initializing database table:', error.message);
+    }
   }
 }
 
